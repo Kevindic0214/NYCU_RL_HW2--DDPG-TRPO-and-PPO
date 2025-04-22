@@ -26,7 +26,7 @@ from torch.utils.tensorboard import SummaryWriter
 #)
 
 # Define a tensorboard writer
-writer = SummaryWriter("./tb_record_3/")
+writer = SummaryWriter("./tb_record_3/Pendulum-v1")
 
 def soft_update(target, source, tau):
     for target_param, param in zip(target.parameters(), source.parameters()):
