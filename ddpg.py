@@ -333,5 +333,4 @@ if __name__ == '__main__':
     env.reset(seed=random_seed)  
     torch.manual_seed(random_seed)
     
-    log_interval = 100
     train(env, env_name='Pendulum-v1')
