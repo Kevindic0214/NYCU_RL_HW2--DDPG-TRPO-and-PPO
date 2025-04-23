@@ -124,7 +124,7 @@ def test_model(actor_path, episodes=5, max_steps=200, delay=0.01):
 
 if __name__ == "__main__":
     # 硬編碼的參數設定
-    model_path = "preTrained/ddpg_actor_Pendulum-v1_04222025_215143_.pth"  # 模型檔案路徑
+    model_path = "preTrained/ddpg_actor_Pendulum-v1_04232025_164317_.pth"  # 模型檔案路徑
     num_episodes = 5               # 測試回合數
     max_steps = 200               # 每個回合最大步數
     step_delay = 0.01             # 每步延遲時間

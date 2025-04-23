@@ -109,16 +109,15 @@ class Actor(nn.Module):
 class Critic(nn.Module):
     def __init__(self, hidden_size, num_inputs, action_space):
         super(Critic, self).__init__()
+        self.action_space = action_space
         num_outputs = action_space.shape[0]
 
         ########## YOUR CODE HERE (5~10 lines) ##########
         # Construct your own critic network
-        self.state_net = nn.Sequential(
-            nn.Linear(num_inputs, hidden_size),
-            nn.ReLU()
-        )
-        self.out_net = nn.Sequential(
-            nn.Linear(hidden_size + num_outputs, hidden_size),
+        self.net = nn.Sequential(
+            nn.Linear(num_inputs + num_outputs, hidden_size),
+            nn.ReLU(),
+            nn.Linear(hidden_size, hidden_size),
             nn.ReLU(),
             nn.Linear(hidden_size, 1)
         )
@@ -128,11 +127,9 @@ class Critic(nn.Module):
         
         ########## YOUR CODE HERE (5~10 lines) ##########
         # Define the forward pass your critic network
-        h = self.state_net(inputs)
-        x = torch.cat([h, actions], dim=1)
-        return self.out_net(x)
-        ########## END OF YOUR CODE ##########        
-        
+        x = torch.cat([inputs, actions], dim=1)
+        return self.net(x)
+        ########## END OF YOUR CODE ##########
 
 class DDPG(object):
     def __init__(self, num_inputs, action_space, gamma=0.995, tau=0.0005, hidden_size=128, lr_a=1e-4, lr_c=1e-3):
@@ -173,6 +170,7 @@ class DDPG(object):
 
 
     def update_parameters(self, batch):
+        # Convert list[Transition] to batch format
         if isinstance(batch, list):
             batch = Transition(*zip(*batch))
             
@@ -190,13 +188,14 @@ class DDPG(object):
             q_next = self.critic_target(next_state_batch, next_actions)
             q_target = reward_batch + mask_batch * self.gamma * q_next
 
+        # Critic update
         q_current = self.critic(state_batch, action_batch)
-        value_loss = F.mse_loss(q_current, q_target)
+        value_loss = F.smooth_l1_loss(q_current, q_target)
         self.critic_optim.zero_grad()
         value_loss.backward()
         self.critic_optim.step()
 
-        # Actor update (maximize Q)
+        # Actor update
         policy_loss = -self.critic(state_batch, self.actor(state_batch)).mean()
         self.actor_optim.zero_grad()
         policy_loss.backward()
@@ -231,7 +230,7 @@ class DDPG(object):
             self.critic.load_state_dict(torch.load(critic_path))
 
 def train(env, env_name):    
-    num_episodes = 300
+    num_episodes = 200
     gamma = 0.995
     tau = 0.002
     hidden_size = 128
@@ -256,7 +255,7 @@ def train(env, env_name):
         ounoise.scale = noise_scale
         ounoise.reset()
         
-        state = torch.as_tensor(env.reset(), dtype=torch.float32).unsqueeze(0)
+        state = torch.from_numpy(env.reset()).float().unsqueeze(0)
 
         episode_reward = 0
         while True:
@@ -265,12 +264,12 @@ def train(env, env_name):
             # 1. Interact with the env to get new (s,a,r,s') samples 
             action = agent.select_action(state, ounoise)
             next_obs, reward, done, _ = env.step(action.numpy()[0])
-            next_state = torch.as_tensor(next_obs, dtype=torch.float32).unsqueeze(0)
+            next_state = torch.tensor(next_obs, dtype=torch.float32).unsqueeze(0)
             episode_reward += reward
 
             # 2. Push the sample to the replay buffer
-            mask = torch.as_tensor([[0.0] if done else [1.0]], dtype=torch.float32)
-            reward_t = torch.as_tensor([[reward]], dtype=torch.float32)
+            mask = torch.tensor([[0.0] if done else [1.0]], dtype=torch.float32)
+            reward_t = torch.tensor([[reward]], dtype=torch.float32)
             memory.push(state, action, mask, next_state, reward_t)
 
             state = next_state
@@ -295,7 +294,7 @@ def train(env, env_name):
         rewards.append(episode_reward)
         t = 0
         if i_episode % print_freq == 0:
-            state = torch.Tensor([env.reset()])
+            state = torch.tensor(env.reset()).float().unsqueeze(0)
             episode_reward = 0
             while True:
                 action = agent.select_action(state)
@@ -306,7 +305,7 @@ def train(env, env_name):
                 
                 episode_reward += reward
 
-                next_state = torch.Tensor([next_state])
+                next_state = torch.tensor(next_state).float().unsqueeze(0)
 
                 state = next_state
                 
@@ -332,5 +331,4 @@ if __name__ == '__main__':
     env = gym.make('Pendulum-v1')
     env.reset(seed=random_seed)  
     torch.manual_seed(random_seed)
-    
     train(env, env_name='Pendulum-v1')
